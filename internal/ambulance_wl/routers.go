@@ -40,16 +40,16 @@ func NewRouterWithGinEngine(router *gin.Engine, handleFunctions ApiHandleFunctio
 			route.HandlerFunc = DefaultHandleFunc
 		}
 		switch route.Method {
-		case http.MethodGet:
-			router.GET(route.Pattern, route.HandlerFunc)
-		case http.MethodPost:
-			router.POST(route.Pattern, route.HandlerFunc)
-		case http.MethodPut:
-			router.PUT(route.Pattern, route.HandlerFunc)
-		case http.MethodPatch:
-			router.PATCH(route.Pattern, route.HandlerFunc)
-		case http.MethodDelete:
-			router.DELETE(route.Pattern, route.HandlerFunc)
+			case http.MethodGet:
+				router.GET(route.Pattern, route.HandlerFunc)
+			case http.MethodPost:
+				router.POST(route.Pattern, route.HandlerFunc)
+			case http.MethodPut:
+				router.PUT(route.Pattern, route.HandlerFunc)
+			case http.MethodPatch:
+				router.PATCH(route.Pattern, route.HandlerFunc)
+			case http.MethodDelete:
+				router.DELETE(route.Pattern, route.HandlerFunc)
 		}
 	}
 
