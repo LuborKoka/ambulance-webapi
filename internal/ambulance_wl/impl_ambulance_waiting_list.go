@@ -10,10 +10,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type implAmbulanceWaitingListAPI struct {
 	logger zerolog.Logger
+	tracer trace.Tracer
 }
 
 func NewAmbulanceWaitingListApi() AmbulanceWaitingListAPI {
@@ -21,7 +24,16 @@ func NewAmbulanceWaitingListApi() AmbulanceWaitingListAPI {
 }
 
 func (o implAmbulanceWaitingListAPI) CreateWaitingListEntry(c *gin.Context) {
+	ctx, span := o.tracer.Start(c.Request.Context(), "CreateWaitingListEntry")
+	defer span.End()
+	// update request context to build span hierarchy accross calls and services
+	c.Request = c.Request.WithContext(ctx)
+
 	updateAmbulanceFunc(c, func(c *gin.Context, ambulance *Ambulance) (*Ambulance, interface{}, int) {
+		ctx, span := o.tracer.Start(c.Request.Context(), "CreateWaitingListEntry-updateAmbulanceFunc")
+		defer span.End()
+		// update context to build span hierarchy accross calls
+		c.Request = c.Request.WithContext(ctx)
 		logger := o.logger.With().
 			Str("method", "CreateWaitingListEntry").
 			Str("ambulanceId", ambulance.Id).
@@ -30,6 +42,7 @@ func (o implAmbulanceWaitingListAPI) CreateWaitingListEntry(c *gin.Context) {
 		var entry WaitingListEntry
 
 		if err := c.ShouldBindJSON(&entry); err != nil {
+			span.SetStatus(codes.Error, "Failed to bind JSON")
 			logger.Error().Err(err).Msg("Failed to bind JSON")
 			return nil, gin.H{
 				"status":  http.StatusBadRequest,
@@ -41,6 +54,7 @@ func (o implAmbulanceWaitingListAPI) CreateWaitingListEntry(c *gin.Context) {
 		if entry.PatientId == "" {
 			logger.Error().Msg("Patient ID is required")
 			logger.Trace().Msgf("Entry: %+v", entry)
+			span.SetStatus(codes.Error, "Patient ID is required")
 			return nil, gin.H{
 				"status":  http.StatusBadRequest,
 				"message": "Patient ID is required",
@@ -60,6 +74,7 @@ func (o implAmbulanceWaitingListAPI) CreateWaitingListEntry(c *gin.Context) {
 
 		if conflictIndx >= 0 {
 			logger.Error().Msg("Entry already exists")
+			span.SetStatus(codes.Error, "Entry already exists")
 			return nil, gin.H{
 				"status":  http.StatusConflict,
 				"message": "Entry already exists",
@@ -74,6 +89,7 @@ func (o implAmbulanceWaitingListAPI) CreateWaitingListEntry(c *gin.Context) {
 		})
 		if entryIndx < 0 {
 			logger.Error().Msg("Failed to find entry in waiting list after saving")
+			span.SetStatus(codes.Error, "Failed to find entry in waiting list after saving")
 			return nil, gin.H{
 				"status":  http.StatusInternalServerError,
 				"message": "Failed to save entry",
@@ -82,6 +98,7 @@ func (o implAmbulanceWaitingListAPI) CreateWaitingListEntry(c *gin.Context) {
 		logger.Info().
 			Str("entry-id", ambulance.WaitingList[entryIndx].Id).
 			Msg("Succesfully created patient entry")
+		span.SetStatus(codes.Ok, "Succesfully created patient entry")
 		return ambulance, ambulance.WaitingList[entryIndx], http.StatusOK
 	})
 }
